@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <%- include("../../_share/metadata.ejs") %>
+  <%- include("../../_share/stylesheets.ejs") %>
+  <title>Beertter</title>
+</head>
+<body>
+
+  <div class="outerframe">
+    <%- include("../../_share/navbar.ejs") %>
+    <main class="container" role="main">
+      <div class="border-bottom my-5">
+        <h1>口コミの投稿</h1>
+      </div>
+
+      <div class="alert alert-success my-5">投稿が完了しました。</div>
+      
+      <div class="text-center my5">
+        <a class="btn btn-outline-primary" href="/shops/<%= shopId %>">ショップページへ戻る</a>
+      </div>
+
+    </main>
+    <%- include("../../_share/fotter.ejs") %>
+  </div>
+  
+  <%- include("../../_share/javascripts.ejs") %>
+  <script src="/public/javascripts/complete.js"></script>
+</body>
+</html>

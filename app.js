@@ -1,11 +1,17 @@
 require("dotenv").config();
-const PORT = process.env.PORT;
+const appconfig = require("./config/application.config.js");
+const dbconfig = require("./config/mysql.config.js");
 const path = require("path");
-const logger = require("./lib/log/logger.js")
-const applicationlogger = require("./lib/log/applicationlogger.js")
-const accesslogger = require("./lib/log/accesslogger.js")
+const logger = require("./lib/log/logger.js");
+const applicationlogger = require("./lib/log/applicationlogger.js");
+const accesslogger = require("./lib/log/accesslogger.js");
+const accesscontrol = require("./lib/security/accesscontrol.js");
 const express = require("express");
 const favicon = require("serve-favicon");
+const cookie = require("cookie-parser");
+const session = require("express-session");
+const MySQLStore = require("express-mysql-session")(session);
+const flash = require("connect-flash");
 const app = express();
 
 // settings
@@ -26,16 +32,37 @@ app.use("/public", express.static(path.join(__dirname, "/public")));
 // set access log.
 app.use(accesslogger());
 
-// dynamic resource
+// set middleware
+app.use(cookie());
+app.use(session({
+  store: new MySQLStore({
+    host: dbconfig.HOST,
+    port: dbconfig.PORT,
+    user: dbconfig.USERNAME,
+    password: dbconfig.PASSWORD,
+    database: dbconfig.DATABASE,
+  }),
+  secret: appconfig.security.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: true,
+  name: "sid"
+}))
+// formからのpostを読めるようにするミドルウェア
+app.use(express.urlencoded({ extended: true }));
+app.use(flash());
+// accesscontrol側で配列を返し、それを展開して使う...
+app.use(...accesscontrol.initialize());
 
+// dynamic resource
+app.use("/account", require("./routes/account.js"));
 app.use("/search", require("./routes/search.js"));
 app.use("/shops", require("./routes/shops.js"));
 app.use("/", require("./routes/index.js"));
 
 // set application log.
 app.use(applicationlogger());
-
+console.log(dbconfig);
 // application 
-app.listen(PORT, () => {
-  logger.application.info(`Application listening at ${PORT}`);
+app.listen(appconfig.PORT, () => {
+  logger.application.info(`Application listening at ${appconfig.PORT}`);
 })
