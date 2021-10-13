@@ -39,6 +39,12 @@
             </div>
           </div>
 
+          <div class="form-group row">
+          </div>
+          <% if (message && message.length !== 0) { %>
+            <div class="alert alert-danger"><%= message %></div>
+          <% } %>  
+
         </form>
       </div>
 
