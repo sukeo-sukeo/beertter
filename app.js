@@ -13,6 +13,9 @@ const cookie = require("cookie-parser");
 const session = require("express-session");
 const MySQLStore = require("express-mysql-session")(session);
 const flash = require("connect-flash");
+const gracefulShutdown = require("http-graceful-shutdown");
+const { resolve } = require("path");
+const pool = require("./lib/database/pool.js");
 const app = express();
 
 // settings
@@ -49,7 +52,7 @@ app.use(session({
   },
   secret: appconfig.security.SESSION_SECRET,
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false,
   name: "sid"
 }))
 // formからのpostを読めるようにするミドルウェア
@@ -59,15 +62,57 @@ app.use(flash());
 app.use(...accesscontrol.initialize());
 
 // dynamic resource
-app.use("/account", require("./routes/account.js"));
-app.use("/search", require("./routes/search.js"));
-app.use("/shops", require("./routes/shops.js"));
-app.use("/", require("./routes/index.js"));
+app.use("/", (() => {
+  const router = express.Router();
+  // クリックジャッキング対策 iframe不可設定
+  // routeing時に必ず下記headerを付加する記述
+  router.use((req, res, next) => {
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    next();
+  });
+  router.use("/account", require("./routes/account.js"));
+  router.use("/search", require("./routes/search.js"));
+  router.use("/shops", require("./routes/shops.js"));
+  // router.use("/test", (req, res) => {throw new Error("test error")});
+  router.use("/", require("./routes/index.js"));
+  return router;
+ })());
 
 // set application log.
 app.use(applicationlogger());
-console.log(dbconfig);
+
+// Custom Error page
+app.use((req, res, next) => {
+  res.status(404);
+  res.render("./404.ejs");
+});
+app.use((err, req, res, next) => {
+  res.status(500);
+  res.render("./500.ejs");
+});
+
 // application 
-app.listen(appconfig.PORT, () => {
+let server = app.listen(appconfig.PORT, () => {
   logger.application.info(`Application listening at ${appconfig.PORT}`);
-})
+});
+
+// Graceful shutdown
+gracefulShutdown(server, {
+  signals: "SIGINT SIGTERM",
+  timeout: 10000,
+  onShutdown: () => {
+    return new Promise((resolve, reject) => {
+      const { pool } = require("./lib/database/pool.js");
+      pool.end(err => {
+        if (err) {
+          return reject(err);
+        }
+        resolve();
+      })
+    });
+  },
+  finally: () => {
+    const logger = require("./lib/log/logger.js").application;
+    logger.info("Application shutdown finished.")
+  }
+});
